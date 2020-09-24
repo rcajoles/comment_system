@@ -76,7 +76,7 @@
                             <div v-if="commentLevelTwo.length">
                                 <template v-for="comment2 in commentLevelTwo">
                                     <b-card
-                                        class="comment-level-two"
+                                        class="comment-level"
                                         :title="comment2.name"
                                         :sub-title="comment2.created_at"
                                         v-if="comment2.parent == post.id && comment2.level == 2 "
@@ -87,16 +87,51 @@
                                             {{comment2.comment}}
                                         </b-card-text>
 
-                                        <a href="#" class="card-link">Reply</a>
+                                        <b-form @submit="onSubmit3($event, comment2.id)">
 
-                                        <!-- <b-card title="Card title" sub-title="Card subtitle">
-                                            <b-card-text>
-                                            Some quick example text to build on the <em>card title</em> and make up the bulk of the card's
-                                            content.
-                                            </b-card-text>
+                                            <b-button type="submit" variant="link">Reply</b-button>
+
+                                            <b-form-group id="input-name" :label-for="'level_3_name_' + comment2.id">
+                                                <b-form-input
+                                                :id="'level_3_name_' + comment2.id"
+                                                v-model="form3.names[comment2.id]"
+                                                type="text"
+                                                required
+                                                placeholder="Enter name"
+                                                ></b-form-input>
+                                            </b-form-group>
+
+                                            <b-form-group id="input-comment" :label-for="'level_3_comment_' + comment2.id">
+                                                <b-form-input
+                                                :id="'level_3_comment_' + comment2.id"
+                                                v-model="form3.comments[comment2.id]"
+                                                type="text"
+                                                required
+                                                class="form-control"
+                                                placeholder="Enter comment"
+                                                ></b-form-input>
+                                            </b-form-group>
 
 
-                                        </b-card> -->
+                                        </b-form>
+
+                                        <div v-if="commentLevelThree.length">
+                                            <template v-for="comment3 in commentLevelThree">
+                                                <b-card
+                                                    class="comment-level"
+                                                    :title="comment3.name"
+                                                    :sub-title="comment3.created_at"
+                                                    v-if="comment3.parent == comment2.id && comment3.level == 3 "
+                                                    :key="comment3.id"
+                                                >
+                                                    <b-card-text>
+                                                        {{ comment3.comment }}
+                                                    </b-card-text>
+
+
+                                                </b-card>
+                                            </template>
+                                        </div>
 
                                     </b-card>
                                 </template>
@@ -113,7 +148,8 @@
 </template>
 
 <script>
-import Comment from "../services/comment";
+import CommentService from "../services/comment";
+
  export default {
      beforeMount() {
        this.initialize();
@@ -123,7 +159,7 @@ import Comment from "../services/comment";
              form: {
                  name: '',
                  comment: '',
-                 leve: 1,
+                 level: 1,
                  parent: null,
              },
              form2: {
@@ -132,30 +168,43 @@ import Comment from "../services/comment";
                  level: 2,
                  parents: []
              },
+             form3: {
+                 names: [],
+                 comments: [],
+                 level: 3,
+                 parents: []
+             },
              show: true,
              posts: [],
              commentLevelTwo: [],
+             commentLevelThree: [],
          }
      },
      methods: {
+         /**
+          * Populate Comment UI with data
+          * @param void
+          */
          initialize() {
-             Comment.getAll()
+
+             CommentService.getAll()
                 .then(response => {
 
-                    console.log('response: ', response);
-
                     if (response.status === 200) {
+                        this.posts = [],
+                        this.commentLevelTwo = [],
+                        this.commentLevelThree = [],
 
                         response.data.data.map(comment => {
                             if (comment.parent == null) {
                                 this.posts.push(comment);
                             } else if (comment.parent != null && comment.level == 2) {
                                 this.commentLevelTwo.push(comment);
+                            } else if (comment.parent != null && comment.level == 3) {
+                                this.commentLevelThree.push(comment);
                             }
                         })
 
-                        console.log('this.posts: ', this.posts);
-                        console.log('this.commentLevelTwo: ', this.commentLevelTwo);
                     }
                 })
                 .catch(error => {
@@ -163,20 +212,42 @@ import Comment from "../services/comment";
                 })
 
          },
+         /**
+          * Submit for Main Comment(Post)
+          * @param evt
+          */
          onSubmit(evt) {
              evt.preventDefault()
 
-             Comment.postComment(this.form)
+             CommentService.postComment(this.form)
                     .then(result => {
-                        console.log('result: ', result);
-                        if (result.status == 200) {
+
+                        if (result.data.status == 200) {
                             this.initialize();
+
+                                this.form = {
+                                    name: '',
+                                    comment: '',
+                                    level: 1,
+                                    parent: null,
+                                };
+
+                        } else if (result.data.status == 400) {
+                            if (result.data.errors) {
+                                this.showToast('danger', result.data.errors);
+                                console.log('error!', result);
+                            }
                         }
                     })
                     .catch(error => {
                         console.log('error: ', error);
                     })
          },
+         /**
+          * Submit for Comment Level 2
+          * @param evt
+          * @param val
+          */
          onSubmit2(evt, val) {
              evt.preventDefault()
 
@@ -187,20 +258,63 @@ import Comment from "../services/comment";
                 parent: val,
             }
 
-             console.log('newFOrm: ', newForm);
-
-             Comment.postComment(newForm)
+             CommentService.postComment(newForm)
                     .then(result => {
-                        console.log('newForm result: ', result);
-                        if (result.status == 200) {
+
+                        console.log('result: ', result);
+
+                        if (result.data.status == 200) {
                             this.initialize();
 
                             this.form2 = {
                                 names: [],
                                 comments: [],
-                                level: 2,
                                 parents: []
                             };
+
+                        } else if (result.data.status == 400) {
+                            if (result.data.errors) {
+                                this.showToast('danger', result.data.errors);
+                                console.log('error!', result);
+                            }
+                        }
+
+                    })
+                    .catch(error => {
+                        console.log('error: ', error);
+                    })
+         },
+         /**
+          * Submit for Comment Level 3
+          * @param evt
+          * @param val
+          */
+         onSubmit3(evt, val) {
+             evt.preventDefault()
+
+            let newForm = {
+                name: this.form3.names[val],
+                comment: this.form3.comments[val],
+                level: 3,
+                parent: val,
+            }
+
+             CommentService.postComment(newForm)
+                    .then(result => {
+
+                        if (result.data.status == 200) {
+                            this.initialize();
+
+                            this.form3 = {
+                                names: [],
+                                comments: [],
+                                parents: []
+                            };
+                        } else if (result.data.status == 400) {
+                            if (result.data.errors) {
+                                this.showToast('danger', result.data.errors);
+                                console.log('error!', result);
+                            }
                         }
                     })
                     .catch(error => {
@@ -218,6 +332,19 @@ import Comment from "../services/comment";
                  this.show = true
              })
          },
+         showToast(variant = null, msg) {
+
+             let title = ''
+             if (variant == 'danger') {
+                 title = 'Error'
+             }
+
+            this.$bvToast.toast(msg[0], {
+                title: `${title || 'default'}`,
+                variant: variant,
+                solid: true
+            })
+        }
      }
  }
 </script>
@@ -233,7 +360,7 @@ import Comment from "../services/comment";
     margin-bottom: 40px;
 }
 
-.comment-level-two {
+.comment-level {
     margin: 10px;
 }
 </style>

@@ -41,8 +41,8 @@ class CommentController extends Controller
         $validator = Validator::make($all, [
             "parent" => "integer|nullable",
             "level" => "integer",
-            "name" => "string",
-            "comment" => "string",
+            "name" => "required|string|max:255|regex:/^[a-zA-Z0-9\s]+$/",
+            "comment" => "required|string|max:255",
         ]);
 
         if ($validator->fails()) {
@@ -54,9 +54,18 @@ class CommentController extends Controller
             ]);
         }
 
+        $all = $request->all();
+
+        $all['comment'] = strip_tags($all['comment']);
+
         $comment = Comment::create($request->all());
 
-        return response()->json($comment);
+        $response = [
+            'data' => $comment,
+            'status' => 200
+        ];
+
+        return response()->json($response);
     }
 
     /**
